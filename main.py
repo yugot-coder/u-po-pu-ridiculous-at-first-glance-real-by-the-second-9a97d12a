@@ -50,6 +50,7 @@ sentence ending in a single period, with no trailing newline.
 """
 
 import os
+import sys
 
 ENTRY = (
     "We sell naming rights to potholes: sponsors pay $200 to brand "
@@ -100,8 +101,37 @@ def main() -> None:
     # intended sentence, and be byte-identical to it.
     with open(path, "rb") as f:
         data = f.read()
-    assert validate_entry(data) == ENTRY
-    assert data == ENTRY.encode("utf-8")
+    # Strengthened read-back verification: exact byte-length check
+    # plus byte-for-byte comparison against the intended entry.
+    # Any mismatch exits non-zero via SystemExit (not a bare assert,
+    # so the check cannot be disabled with python -O).
+    expected_bytes = ENTRY.encode("utf-8")
+    if len(data) != len(expected_bytes):
+        print(
+            f"read-back failed: entry.txt is {len(data)} bytes, "
+            f"expected exactly {len(expected_bytes)} bytes",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if data != expected_bytes:
+        print(
+            "read-back failed: entry.txt bytes do not match the "
+            "intended entry",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    try:
+        verified = validate_entry(data)
+    except (AssertionError, UnicodeDecodeError) as exc:
+        print(f"read-back failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    if verified != ENTRY:
+        print(
+            "read-back failed: decoded entry.txt does not match "
+            "the intended entry",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
     print(ENTRY)
 
 
